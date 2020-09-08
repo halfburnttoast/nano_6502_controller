@@ -1,12 +1,16 @@
 /* 
  *  WARNING: Optimizations for Arduino Nano controller ONLY
  *  To enable full speed optimization:
- *      Uncomment NANO_OPT header switch
- *      Compile with -O3 optimization level. 
- *          (Copy the contents of platform.txt.speed to platform.txt)
+ *      Uncomment NANO_OPT and COMPILE_O3 header switches
  */
 
-#define NANO_OPT              // Optimize for high-speed. Comment for debugging.
+#define NANO_OPT            // Optimize for high-speed.
+#define COMPILE_O3          // Compile for high-speed.
+
+#ifdef COMPILE_O3
+#pragma GCC push_options
+#pragma GCC optimize ("O3")
+#endif
 
 typedef uint8_t  BYTE;
 typedef uint16_t WORD;
@@ -30,11 +34,10 @@ char serial_output_buffer[SERIAL_OUTPUT_BUFFER_SIZE];
 const BYTE data_pins[] = {
 	4, 5, 6, 7, 8, 9, 10, 11
 };
-BYTE data_direction = DINPUT;
 
 
 // printf wrapper for serial output
-void sprint(const char *fmt, ...) {
+void __attribute__((optimize("Os"))) sprint(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vsnprintf(serial_output_buffer, SERIAL_OUTPUT_BUFFER_SIZE, fmt, args);
@@ -51,7 +54,6 @@ inline void data_direction_input(void) {
     DDRD = DDRD & 0x0F;
     DDRB = DDRB & 0xF0;
 #endif
-    data_direction = DINPUT;
 }
 
 #ifndef NANO_OPT                            // use default abstracted functions 
@@ -65,7 +67,6 @@ inline void data_direction_output(void) {
     PORTD = PORTD & 0x0F;
     PORTB = PORTB & 0xF0;
 #endif
-    data_direction = DOUTPUT;
 }
 
 inline void clk_pulse(void) {
@@ -73,8 +74,9 @@ inline void clk_pulse(void) {
     digitalWrite(CLK, LOW);
     digitalWrite(CLK, HIGH);
 #else
-    //PORTD = PORTD ^ 0x8;   
-    //PORTD = PORTD ^ 0x8;
+    /*  This saves two instructions and a register over port manipulation. 
+     *   The compiler will do another 'in' instruction which is unnecessary.
+     */
     __asm__ __volatile__ (
         "in r24, 0xB \n\t"
         "andi r24, 0xF7 \n\t"
@@ -85,6 +87,8 @@ inline void clk_pulse(void) {
         :
         : "r24"
     );
+    //PORTD = PORTD ^ 0x8;   
+    //PORTD = PORTD ^ 0x8;
 #endif
 }
 
@@ -112,7 +116,6 @@ void setup(void) {
     digitalWrite(RDY, HIGH);
     sprint("# Setup Complete.\r\n");
 }
-
 
 void loop(void) {
     digitalWrite(N_RES, LOW);
@@ -192,3 +195,6 @@ void loop(void) {
         //delay(20);
     }
 }
+#ifdef COMPILE_O3
+#pragma GCC pop_options
+#endif

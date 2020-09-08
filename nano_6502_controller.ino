@@ -73,14 +73,23 @@ inline void clk_pulse(void) {
     digitalWrite(CLK, LOW);
     digitalWrite(CLK, HIGH);
 #else
-    PORTD = PORTD ^ 0x8;   
-    PORTD = PORTD ^ 0x8;
+    //PORTD = PORTD ^ 0x8;   
+    //PORTD = PORTD ^ 0x8;
+    __asm__ __volatile__ (
+        "in r24, 0xB \n\t"
+        "andi r24, 0xF7 \n\t"
+        "out 0xB, r24 \n\t"
+        "ori r24, 0x8 \n\t"
+        "out 0xB, r24 \n\t"
+        :
+        :
+        : "r24"
+    );
 #endif
 }
 
 void setup(void) {
     Serial.begin(SERIAL_RATE);
-    delay(1000);
     sprint("\r\n\r\n\r\n# -- TPC65 Controller RESET --\r\n");
     sprint("# Serial Enabled.\r\n");
     randomSeed(analogRead(1));

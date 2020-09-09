@@ -36,7 +36,8 @@ const BYTE data_pins[] = {
 };
 
 
-// printf wrapper for serial output
+// printf wrapper for serial output. Function is super slow and shouldn't be
+// used for anything except debug messages.
 void __attribute__((optimize("Os"))) sprint(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -51,8 +52,16 @@ void data_direction_input(void) {
 		pinMode(data_pins[i], INPUT);
 #else                                       // use port registers
 inline void data_direction_input(void) {
-    DDRD = DDRD & 0x0F;
+    /* Uses 2 instructions instead of 6. Only works because I figured out what possible
+     *  states these pins can be in at this point of execution. Thus, no lookup or 
+     *  bitwise operations are needed.
+     */
+    DDRD = 0x0C;
+    DDRB = 0x20;
+    /*
     DDRB = DDRB & 0xF0;
+    DDRD = DDRD & 0x0F;
+    */
 #endif
 }
 
@@ -62,10 +71,17 @@ void data_direction_output(void) {
 		pinMode(data_pins[i], OUTPUT);
 #else                                       // use port registers
 inline void data_direction_output(void) {
+    // This uses 4 instructions instead of 12. Same reasoning as data_direction_input
+    DDRD = 0xFC;                
+    DDRB = 0x2F;
+    PORTD = 0x0F;
+    PORTB = 0x20;
+    /*
     DDRD = DDRD | 0xF0;
     DDRB = DDRB | 0x0F;
     PORTD = PORTD & 0x0F;
     PORTB = PORTB & 0xF0;
+    */
 #endif
 }
 
@@ -92,6 +108,7 @@ inline void clk_pulse(void) {
 #endif
 }
 
+
 void setup(void) {
     Serial.begin(SERIAL_RATE);
     sprint("\r\n\r\n\r\n# -- TPC65 Controller RESET --\r\n");
@@ -117,7 +134,7 @@ void setup(void) {
     sprint("# Setup Complete.\r\n");
 }
 
-void loop(void) {
+void __attribute__((flatten)) loop(void) {
     digitalWrite(N_RES, LOW);
     BYTE reset_timer = 50;
     sprint("# Reset timer: %d\r\n", reset_timer);
@@ -161,7 +178,7 @@ void loop(void) {
                         PORTB = PORTB | ((dout & 0xF0) >> 4);
 #endif
                     }
-                    data_direction_input();
+                    data_direction_input();         // ISSUE: possible race condition between data direction change and clock pulse out
                     break;
                 } 
                 case 0x20: {
@@ -192,7 +209,6 @@ void loop(void) {
         } 
         // perform one clock pulse per loop. 
         clk_pulse();
-        //delay(20);
     }
 }
 #ifdef COMPILE_O3

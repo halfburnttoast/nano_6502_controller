@@ -56,8 +56,8 @@ inline void data_direction_input(void) {
      *  states these pins can be in at this point of execution. Thus, no lookup or 
      *  bitwise operations are needed.
      */
-    DDRD = 0x0C;
-    DDRB = 0x20;
+    DDRD = 0x0C;                // bits 0x0C are always outputs
+    DDRB = 0x20;                // bit 0x20 is always output
     /*
     DDRB = DDRB & 0xF0;
     DDRD = DDRD & 0x0F;
@@ -72,10 +72,10 @@ void data_direction_output(void) {
 #else                                       // use port registers
 inline void data_direction_output(void) {
     // This uses 4 instructions instead of 12. Same reasoning as data_direction_input
-    DDRD = 0xFC;                
-    DDRB = 0x2F;
-    PORTD = 0x0F;
-    PORTB = 0x20;
+    DDRD = 0xFC;                // bits 0x0C will always be output, 0x3 are never used
+    DDRB = 0x2F;                // bit  0x20 will always be output, 0xC0 are never used
+    PORTD = 0x0F;               // data ports must still be set to low on state change
+    PORTB = 0x20;               //  "
     /*
     DDRD = DDRD | 0xF0;
     DDRB = DDRB | 0x0F;
@@ -90,18 +90,30 @@ inline void clk_pulse(void) {
     digitalWrite(CLK, LOW);
     digitalWrite(CLK, HIGH);
 #else
+/*
     /*  This saves two instructions and a register over port manipulation. 
      *   The compiler will do another 'in' instruction which is unnecessary.
-     */
     __asm__ __volatile__ (
-        "in r24, 0xB \n\t"
-        "andi r24, 0xF7 \n\t"
-        "out 0xB, r24 \n\t"
-        "ori r24, 0x8 \n\t"
-        "out 0xB, r24 \n\t"
+        "in r24, 0xB    \n\t"           // PORTD->R24
+        "andi r24, 0xF7 \n\t"           // R24 &= 0xF7 - sets clock bit to low
+        "out 0xB, r24   \n\t"           // R24->PORTD
+        "ori r24, 0x8   \n\t"           // R24 |= 0x8  - sets clock bit back to high
+        "out 0xB, r24   \n\t"           // R24->PORTD
         :
         :
         : "r24"
+    );
+    */
+    
+    /* Found these opcodes in the datasheet. Does the same as above with two instructions.
+     *  which translates to about two AVR cpu cycles. This increases the PH0 output from
+     *  2MHz to about 2.28MHz. I doubt it's possible for the AVR to go any faster without
+     *  losing synchronization with the 65C02.
+     */
+    __asm__ __volatile__ (
+        "cbi 0xB, 0x3   \n\t"
+        "sbi 0xB, 0x3   \n\t"
+        ::
     );
     //PORTD = PORTD ^ 0x8;   
     //PORTD = PORTD ^ 0x8;

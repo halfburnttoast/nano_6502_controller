@@ -21,4 +21,4 @@ Cons:
 - Non-stable clock output: Arduino requires interrupts to function for serial, thus an interrupt will pause the PH0 clock output. 
 - Somewhat complicated to optimize and makes it harder to read. 
 
-I have optimized the code (along with adjusting the compiler optimization settings) to achieve an average PH0 clock output, according to my oscilloscope, of 1.66MHz (maximum ~2MHz, minimum ~200KHz). Without the optimizations, the PH0 output is around 80KHz. The true speed is hard to calculate, and programs requesting serial IO will run slower than programs that don't. 
+I have optimized the code (along with adjusting the compiler optimization settings) to achieve an average PH0 clock output, according to my oscilloscope, of 2.3MHz (maximum ~2.5MHz, minimum ~2MHz). Without the optimizations, the PH0 output is around 80KHz. The true speed is hard to calculate, and programs requesting serial IO will run slower than programs that don't. 
